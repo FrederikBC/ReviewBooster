@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ReviewBooster — Demo</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Arial;background:#f6fafc;color:#04223a;padding:18px}
+    .container{max-width:900px;margin:0 auto}
+    header{display:flex;justify-content:space-between;align-items:center}
+    .card{background:white;padding:16px;border-radius:10px;box-shadow:0 6px 20px rgba(2,6,23,0.06);margin-top:14px}
+    .btn{padding:8px 12px;border-radius:8px;border:0;background:#06b6d4;color:#022;font-weight:700;cursor:pointer}
+    input,textarea{width:100%;padding:8px;margin-top:6px;border-radius:8px;border:1px solid #e6eef6}
+    pre{background:#071226;color:#fff;padding:12px;border-radius:8px;overflow:auto}
+    .muted{color:#6b7280;font-size:14px}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    @media(max-width:720px){.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>ReviewBooster — Demo</h1>
+        <div class="muted">Upload CSV, send requests, test rating flow on your phone</div>
+      </div>
+      <div>
+        <button class="btn" onclick="sendAll()">Send alle (simuler)</button>
+      </div>
+    </header>
+
+    <div class="card">
+      <h3>1) Upload CSV (headers: first_name,last_name,email,phone,service_date)</h3>
+      <form id="uploadForm">
+        <input type="file" id="csvfile" accept=".csv" required />
+        <div style="margin-top:8px">
+          <button class="btn" type="submit">Upload og opret anmodninger</button>
+        </div>
+      </form>
+      <div id="uploadResult" style="margin-top:10px"></div>
+    </div>
+
+    <div class="card">
+      <h3>2) Stats &ingen</h3>
+      <div id="statsArea">Henter…</div>
+    </div>
+
+    <div class="card">
+      <h3>3) Test rating-link (åbn på telefon)</h3>
+      <p class="muted">Efter du har klikket "Send alle", får du links. Åbn et link på din telefon for at teste rating-landingpagen.</p>
+      <div id="linksArea"></div>
+    </div>
+
+    <div class="card">
+      <h3>Debug: intern data</h3>
+      <button class="btn" onclick="dump()">Vis intern data</button>
+      <pre id="dumpArea"></pre>
+    </div>
+
+    <footer style="margin-top:18px;color:#475569">Kør backend: <code>cd backend && npm install && npm start</code>. Åbn siden ved din computer-IP: <em>http://YOUR_IP:5000</em></footer>
+  </div>
+
+<script>
+async function refreshStats(){
+  const res = await fetch('/api/stats');
+  const data = await res.json();
+  document.getElementById('statsArea').innerHTML = `
+    <div class="grid">
+      <div class="card" style="box-shadow:none">
+        <strong>Total requests</strong><div style="font-size:22px">${data.total}</div>
+      </div>
+      <div class="card" style="box-shadow:none">
+        <strong>Avg rating</strong><div style="font-size:22px">${data.avgRating || '—'}</div>
+      </div>
+    </div>
+    <div style="margin-top:8px">
+      Seneste requests: <pre>${JSON.stringify(data.requests,null,2)}</pre>
+    </div>
+  `;
+}
+refreshStats();
+document.getElementById('uploadForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const f = document.getElementById('csvfile').files[0];
+  if(!f){ alert('Vælg en CSV-fil'); return; }
+  const form = new FormData();
+  form.append('csv', f);
+  form.append('companyId','1');
+  const res = await fetch('/api/upload', { method:'POST', body: form });
+  const data = await res.json();
+  document.getElementById('uploadResult').textContent = JSON.stringify(data, null, 2);
+  await refreshStats();
+});
+
+async function sendAll(){
+  const res = await fetch('/api/send-all', { method:'POST' });
+  const data = await res.json();
+  document.getElementById('linksArea').innerHTML = data.items.map(it => `<div><a target="_blank" href="${it.link}">${it.link}</a></div>`).join('');
+  alert('Sendt ' + data.sent + ' requests. Kopier et link og åbn på din telefon.');
+  await refreshStats();
+}
+
+async function dump(){
+  const res = await fetch('/api/_dump');
+  const data = await res.json();
+  document.getElementById('dumpArea').textContent = JSON.stringify(data, null, 2);
+}
+</script>
+</body>
+</html>
